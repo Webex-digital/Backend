@@ -11,14 +11,14 @@ import { ChatService } from './chat.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { OrderService } from '../orders/order.service';
 import { UseFilters } from '@nestjs/common';
-import { GlobalExceptionFilter } from '../filters/global-exception.filter';
+import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-@UseFilters(GlobalExceptionFilter)
+@UseFilters(HttpExceptionFilter)
 export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -124,6 +124,12 @@ export class ChatGateway implements OnGatewayDisconnect {
     // 3. AI FAQ Logic & Order Extraction
     if (type === 'TEXT') {
       try {
+        // Signal AI processing started
+        this.server.to(conversationId).emit('system_alert', {
+          type: 'AI_PROCESSING_START',
+          message: 'AI is thinking...',
+        });
+
         // Order Extraction Logic
         const orderExtraction = await this.extractOrderDetails(content, senderId);
         if (orderExtraction) {
@@ -151,8 +157,18 @@ export class ChatGateway implements OnGatewayDisconnect {
 
         // Broadcast AI response to the room
         this.server.to(conversationId).emit('new_message', aiMessage);
+
+        // Signal AI processing ended
+        this.server.to(conversationId).emit('system_alert', {
+          type: 'AI_PROCESSING_END',
+          message: 'AI processing complete.',
+        });
       } catch (error) {
         console.error('AI Order/FAQ Error:', error);
+        this.server.to(conversationId).emit('system_alert', {
+          type: 'AI_ERROR',
+          message: 'Something went wrong with the AI. Please try again.',
+        });
       }
     }
 
