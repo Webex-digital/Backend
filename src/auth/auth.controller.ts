@@ -1,6 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
+import { MixinAuthGuard } from './mixin-auth.guard';
 import { Response } from 'express';
 
 @Controller('auth')
@@ -19,13 +20,13 @@ export class AuthController {
   }
 
   @Get('google')
-  @AuthGuard('google')
+  @UseGuards(MixinAuthGuard)
   async googleAuth(@Req() req) {
     // Guard handles the redirection to Google
   }
 
   @Get('google/callback')
-  @AuthGuard('google')
+  @UseGuards(MixinAuthGuard)
   async googleAuthRedirect(@Req() req, @Res() res: Response) {
     const result = await this.authService.validateGoogleUser(req.user);
 

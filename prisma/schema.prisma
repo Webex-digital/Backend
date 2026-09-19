@@ -65,8 +65,8 @@ model KnowledgeBase {
   id        String   @id @default(uuid())
   title     String
   content   String
-  // Temporarily using Float array
-  embedding Float[]
+  // Using pgvector's vector type
+  embedding Unsupported("vector(1536)")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
