@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { OrderService } from '../orders/order.service';
 import { UseFilters } from '@nestjs/common';
 import { GlobalExceptionFilter } from '../filters/global-exception.filter';
 
@@ -30,6 +31,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   constructor(
     private readonly chatService: ChatService,
     private readonly knowledgeService: KnowledgeService,
+    private readonly orderService: OrderService,
   ) {}
 
   @SubscribeMessage('join_conversation')
@@ -119,12 +121,24 @@ export class ChatGateway implements OnGatewayDisconnect {
     // 2. Broadcast the original message
     this.server.to(conversationId).emit('new_message', message);
 
-    // 3. AI FAQ Logic: If it looks like a question and sender is anonymous (or just always for FAQ)
-    // For this task, we check if it's an FAQ-style request.
-    // In a real app, we might have a specific 'ask_faq' event or a trigger word.
-    // Here we'll just attempt to get an AI answer for every message if it's a text message.
+    // 3. AI FAQ Logic & Order Extraction
     if (type === 'TEXT') {
       try {
+        // Order Extraction Logic
+        const orderExtraction = await this.extractOrderDetails(content, senderId);
+        if (orderExtraction) {
+          // If we extracted details, notify the user and update the DB
+          this.server.to(conversationId).emit('new_message', {
+            id: crypto.randomUUID(),
+            conversationId,
+            senderId: 'AI_ASSISTANT',
+            content: `I've updated your order details. You're looking for: ${orderExtraction.items.map(i => `${i.quantity}x ${i.productId}`).join(', ')}. Total: $${orderExtraction.total}. Is this correct?`,
+            type: 'TEXT',
+            createdAt: new Date(),
+          });
+        }
+
+        // AI FAQ Logic
         const aiAnswer = await this.knowledgeService.askQuestion(content);
         const aiMessage = {
           id: crypto.randomUUID(),
@@ -138,11 +152,57 @@ export class ChatGateway implements OnGatewayDisconnect {
         // Broadcast AI response to the room
         this.server.to(conversationId).emit('new_message', aiMessage);
       } catch (error) {
-        console.error('AI FAQ Error:', error);
-        // We don't broadcast the error to the user to keep the UX clean
+        console.error('AI Order/FAQ Error:', error);
       }
     }
 
     return { status: 'sent', messageId: message.id };
+  }
+
+  @SubscribeMessage('confirm_order')
+  async handleConfirmOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: string },
+  ) {
+    const { orderId } = data;
+    try {
+      const confirmedOrder = await this.orderService.confirmOrder(orderId);
+
+      // Notify the user
+      client.emit('order_confirmed', {
+        orderId: confirmedOrder.id,
+        status: confirmedOrder.status,
+      });
+
+      // Notify Admin (broadcast to all admins or a specific admin room)
+      this.server.emit('admin_notification', {
+        type: 'ORDER_CONFIRMED',
+        orderId: confirmedOrder.id,
+        message: `Order ${confirmedOrder.id} has been confirmed.`,
+      });
+
+      return { status: 'success', orderId: confirmedOrder.id };
+    } catch (error) {
+      console.error('Confirm Order Error:', error);
+      throw error;
+    }
+  }
+
+  private async extractOrderDetails(content: string, userId: string) {
+    // This is a mock of LLM Tool-Calling.
+    // In a real implementation, we would use ChatOpenAI's tool calling.
+    // For this task, we use a simple pattern match to simulate tool extraction.
+    if (content.toLowerCase().includes('order') && (content.toLowerCase().includes('want') || content.toLowerCase().includes('need'))) {
+      const mockDetails = {
+        userId,
+        items: [
+          { productId: 'PROD-123', quantity: 1, price: 100.0 },
+        ],
+        total: 100.0,
+      };
+      await this.orderService.updateDraft(userId, mockDetails);
+      return mockDetails;
+    }
+    return null;
   }
 }
