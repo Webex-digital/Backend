@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
@@ -17,12 +18,14 @@ import { GlobalExceptionFilter } from '../filters/global-exception.filter';
   },
 })
 @UseFilters(GlobalExceptionFilter)
-export class ChatGateway {
+export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   // In-memory map for socketId -> conversationId
   private socketToConversation = new Map<string, string>();
+  // In-memory map for socketId -> userId (for presence)
+  private socketToUser = new Map<string, string>();
 
   constructor(
     private readonly chatService: ChatService,
@@ -32,17 +35,64 @@ export class ChatGateway {
   @SubscribeMessage('join_conversation')
   async handleJoinConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() data: { conversationId: string; userId: string },
   ) {
-    const { conversationId } = data;
-    if (!conversationId) {
-      throw new Error('conversationId is required');
+    const { conversationId, userId } = data;
+    if (!conversationId || !userId) {
+      throw new Error('conversationId and userId are required');
     }
 
     this.socketToConversation.set(client.id, conversationId);
+    this.socketToUser.set(client.id, userId);
     await client.join(conversationId);
 
+    // Broadcast presence: online
+    this.server.to(conversationId).emit('user_presence', {
+      userId,
+      status: 'online',
+    });
+
     return { event: 'joined', data: { conversationId } };
+  }
+
+  @SubscribeMessage('typing_start')
+  handleTypingStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; userId: string },
+  ) {
+    const { conversationId, userId } = data;
+    this.server.to(conversationId).emit('user_typing', {
+      userId,
+      typing: true,
+    });
+  }
+
+  @SubscribeMessage('typing_stop')
+  handleTypingStop(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; userId: string },
+  ) {
+    const { conversationId, userId } = data;
+    this.server.to(conversationId).emit('user_typing', {
+      userId,
+      typing: false,
+    });
+  }
+
+  handleDisconnect(client: Socket) {
+    const conversationId = this.socketToConversation.get(client.id);
+    const userId = this.socketToUser.get(client.id);
+
+    if (conversationId && userId) {
+      // Broadcast presence: offline
+      this.server.to(conversationId).emit('user_presence', {
+        userId,
+        status: 'offline',
+      });
+    }
+
+    this.socketToConversation.delete(client.id);
+    this.socketToUser.delete(client.id);
   }
 
   @SubscribeMessage('send_message')
@@ -59,7 +109,7 @@ export class ChatGateway {
 
     // 1. Persist to DB first
     const message = await this.chatService.saveMessage({
-      conversationId,
+      conversation: { connect: { id: conversationId } },
       senderId,
       content,
       type,

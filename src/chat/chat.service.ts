@@ -12,10 +12,19 @@ export class ChatService {
     });
   }
 
-  async getMessagesByConversation(conversationId: string) {
-    return this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+  async getMessagesByConversation(conversationId: string, limit: number = 20, cursor?: string) {
+    const messages = await this.prisma.message.findMany({
+      where: {
+        conversationId,
+        id: cursor ? { lt: cursor } : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
     });
+
+    return {
+      messages: messages.reverse(),
+      nextCursor: messages.length === limit ? messages[0].id : null,
+    };
   }
 }
