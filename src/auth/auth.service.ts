@@ -50,10 +50,44 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    return this.generateJwtResponse(user);
+  }
+
+  async validateGoogleUser(profile: { googleId: string; email: string; fullName: string }) {
+    let user = await this.prisma.user.findUnique({
+      where: { googleId: profile.googleId },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.findUnique({
+        where: { email: profile.email },
+      });
+
+      if (user) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { googleId: profile.googleId },
+        });
+      } else {
+        user = await this.prisma.user.create({
+          data: {
+            email: profile.email,
+            fullName: profile.fullName,
+            googleId: profile.googleId,
+            role: 'USER',
+          },
+        });
+      }
+    }
+
+    return this.generateJwtResponse(user);
+  }
+
+  private generateJwtResponse(user: any) {
     const payload = {
       sub: user.id,
       email: user.email,
-      role: 'USER'
+      role: user.role || 'USER',
     };
 
     return {
@@ -62,6 +96,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        role: user.role,
       },
     };
   }

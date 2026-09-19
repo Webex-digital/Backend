@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
 
 describe('Auth Integration Test', () => {
   let app: INestApplication;
@@ -93,5 +94,30 @@ describe('Auth Integration Test', () => {
       });
 
     expect(res.status).toBe(401);
+  });
+
+  it('should validate google user and return JWT', async () => {
+    const googleProfile = {
+      googleId: 'google-123',
+      email: 'google-test@example.com',
+      fullName: 'Google User',
+    };
+
+    // We can't easily mock the @AuthGuard('google') in a supertest call without a lot of boilerplate,
+    // but we can test the service logic directly.
+    const authService = app.get(require('../../src/auth/auth.service').AuthService);
+    const result = await authService.validateGoogleUser(googleProfile);
+
+    expect(result).toHaveProperty('access_token');
+    expect(result.user).toHaveProperty('id');
+    expect(result.user.email).toBe(googleProfile.email);
+    expect(result.user.googleId).toBe(googleProfile.googleId);
+
+    // Verify user exists in DB
+    const user = await prisma.user.findUnique({
+      where: { email: googleProfile.email },
+    });
+    expect(user).toBeDefined();
+    expect(user?.googleId).toBe(googleProfile.googleId);
   });
 });
