@@ -10,26 +10,22 @@ datasource db {
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
+  password      String?
   fullName      String?
   googleId      String?  @unique
-  avatarUrl     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
   conversations Conversation[]
   orders        Order[]
-  messages      Message[]
 }
 
 model Conversation {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  title     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  messages Message[]
+  user      User     @relation(fields: [userId], references: [id])
+  messages  Message[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Message {
@@ -37,9 +33,9 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
   content        String
-  embedding      Unsupported("vector(1536)")?
+  // Temporarily using Float array to avoid pgvector dependency until it is installed on host
+  embedding      Float[]
   createdAt      DateTime     @default(now())
 }
 
@@ -47,12 +43,11 @@ model Order {
   id        String      @id @default(uuid())
   userId    String
   user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
   total     Float
   status    String      @default("PENDING")
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-
-  items OrderItem[]
 }
 
 model OrderItem {
@@ -68,7 +63,8 @@ model KnowledgeBase {
   id        String   @id @default(uuid())
   title     String
   content   String
-  embedding Unsupported("vector(1536)")?
+  // Temporarily using Float array
+  embedding Float[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
