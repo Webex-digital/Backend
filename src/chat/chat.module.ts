@@ -5,9 +5,10 @@ import { ChatController } from './chat.controller';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { OrderModule } from '../orders/order.module';
 import { MailModule } from '../mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [KnowledgeModule, OrderModule, MailModule],
+  imports: [KnowledgeModule, OrderModule, MailModule, AuthModule],
   controllers: [ChatController],
   providers: [ChatGateway, ChatService],
 })
