@@ -1,5 +1,5 @@
 import { Controller, Get, Patch, Param, UseGuards, Request } from '@nestjs/common';
-import { ChatService } from '../chat/chat.service';
+import { ChatService } from '../chat/chat.service.js';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { MixinAuthGuard } from '../auth/mixin-auth.guard';
 
