@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma.service';
 import { OrderState, OrderStateMachine } from './order.state-machine';
 import { Prisma } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
 
 export interface OrderDetails {
   userId: string;
@@ -18,6 +19,7 @@ export class OrderService {
   constructor(
     private prisma: PrismaService,
     private stateMachine: OrderStateMachine,
+    private mailService: MailService,
   ) {}
 
   async updateDraft(userId: string, details: OrderDetails) {
@@ -89,10 +91,21 @@ export class OrderService {
       throw new BadRequestException(`Invalid transition from ${currentState} to ${nextState}`);
     }
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: nextState },
     });
+
+    if (nextState === OrderState.CONFIRMED) {
+      // Async email notification to avoid blocking the main thread
+      this.mailService.sendMail(
+        'producelabsandco@gmail.com',
+        `Order Confirmed: #${orderId}`,
+        `An order has been confirmed. Order ID: ${orderId}\nTotal: ${updatedOrder.total}`,
+      ).catch((err: any) => console.error('Email notification failed', err));
+    }
+
+    return updatedOrder;
   }
 
   async confirmOrder(orderId: string) {

@@ -19,6 +19,6 @@ export class MixinAuthGuard extends AuthGuard('jwt') {
     }
 
     // Handle REST context (default AuthGuard behavior)
-    return super.canActivate(context);
+    return super.canActivate(context) as boolean;
   }
 }

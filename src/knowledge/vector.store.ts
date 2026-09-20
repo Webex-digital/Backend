@@ -27,7 +27,7 @@ export class VectorStore {
       LIMIT ${limit}
     `;
 
-    return results.map(r => ({
+    return results.map((r: any) => ({
       content: r.content,
       score: r.similarity,
     }));

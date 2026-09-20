@@ -2,7 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus, Get, Req, Res, UseGuards 
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { MixinAuthGuard } from './mixin-auth.guard';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -21,13 +21,13 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(MixinAuthGuard)
-  async googleAuth(@Req() req) {
+  async googleAuth(@Req() req: any) {
     // Guard handles the redirection to Google
   }
 
   @Get('google/callback')
   @UseGuards(MixinAuthGuard)
-  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+  async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
     const result = await this.authService.validateGoogleUser(req.user);
 
     // In a real app, you'd redirect to frontend with the token.

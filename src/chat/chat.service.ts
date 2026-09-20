@@ -16,6 +16,33 @@ export class ChatService {
     });
   }
 
+  async getLastConversation(userId: string) {
+    return this.prisma.conversation.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async getActiveConversations() {
+    return this.prisma.conversation.findMany({
+      where: {
+        ...({
+          status: { not: 'RESOLVED' },
+        } as any),
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        user: {
+          select: { email: true, fullName: true },
+        },
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+  }
+
   async getMessagesByConversation(conversationId: string, limit: number = 20, cursor?: string) {
     const messages = await this.prisma.message.findMany({
       where: {

@@ -12,6 +12,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { OrderService } from '../orders/order.service';
 import { UseFilters } from '@nestjs/common';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
+import { MailService } from '../mail/mail.service';
 
 @WebSocketGateway({
   cors: {
@@ -32,7 +33,30 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private readonly knowledgeService: KnowledgeService,
     private readonly orderService: OrderService,
+    private readonly mailService: MailService,
   ) {}
+
+  @SubscribeMessage('admin_reply')
+  async handleAdminReply(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; content: string; adminId: string },
+  ) {
+    const { conversationId, content, adminId } = data;
+
+    // 1. Persist admin message to DB
+    const message = await this.chatService.saveMessage({
+      conversation: { connect: { id: conversationId } },
+      senderId: adminId,
+      content,
+      type: 'TEXT',
+      embedding: [],
+    });
+
+    // 2. Broadcast to the user in the room
+    this.server.to(conversationId).emit('new_message', message);
+
+    return { status: 'sent', messageId: message.id };
+  }
 
   @SubscribeMessage('join_conversation')
   async handleJoinConversation(
@@ -97,6 +121,44 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.socketToUser.delete(client.id);
   }
 
+  @SubscribeMessage('faq_message')
+  async handleFaqMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text: string },
+  ) {
+    try {
+      const result = await this.knowledgeService.askQuestion(data.text);
+
+      if (result.requiresHuman) {
+        // Notify team via Email
+        this.mailService.sendMail(
+          'producelabsandco@gmail.com',
+          '🚨 Human Help Needed in Chat',
+          `A user is asking a question that requires human intervention:\n\nQuestion: ${data.text}\n\nThey are waiting for a response in the chat box.`,
+        ).catch(err => console.error('Admin notification failed', err));
+      }
+
+      return { answer: result.answer };
+    } catch (error) {
+      console.error('FAQ Error:', error);
+      return { answer: 'I am sorry, I am having trouble accessing my knowledge base right now.' };
+    }
+  }
+
+  @SubscribeMessage('order_message')
+  async handleOrderMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text: string },
+  ) {
+    try {
+      const response = `I've noted that: "${data.text}". Could you please provide more details about your project requirements?`;
+      return { answer: response };
+    } catch (error) {
+      console.error('Order Error:', error);
+      return { answer: 'Something went wrong with the order processing. Please try again.' };
+    }
+  }
+
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
@@ -133,7 +195,6 @@ export class ChatGateway implements OnGatewayDisconnect {
         // Order Extraction Logic
         const orderExtraction = await this.extractOrderDetails(content, senderId);
         if (orderExtraction) {
-          // If we extracted details, notify the user and update the DB
           this.server.to(conversationId).emit('new_message', {
             id: crypto.randomUUID(),
             conversationId,
@@ -145,20 +206,36 @@ export class ChatGateway implements OnGatewayDisconnect {
         }
 
         // AI FAQ Logic
-        const aiAnswer = await this.knowledgeService.askQuestion(content);
+        const result = await this.knowledgeService.askQuestion(content);
+
+        if (result.requiresHuman) {
+          this.mailService.sendMail(
+            'producelabsandco@gmail.com',
+            '🚨 Human Help Needed in Chat',
+            `A user is asking a question that requires human intervention:\n\nMessage: ${content}\n\nThey are waiting for a response in the chat box.`,
+          ).catch(err => console.error('Admin notification failed', err));
+
+          // Emit real-time alert to all connected admins
+          this.server.emit('admin_notification', {
+            type: 'HUMAN_REQUIRED',
+            conversationId,
+            userId: senderId,
+            message: content,
+            timestamp: new Date(),
+          });
+        }
+
         const aiMessage = {
           id: crypto.randomUUID(),
           conversationId,
           senderId: 'AI_ASSISTANT',
-          content: aiAnswer,
+          content: result.answer,
           type: 'TEXT',
           createdAt: new Date(),
         };
 
-        // Broadcast AI response to the room
         this.server.to(conversationId).emit('new_message', aiMessage);
 
-        // Signal AI processing ended
         this.server.to(conversationId).emit('system_alert', {
           type: 'AI_PROCESSING_END',
           message: 'AI processing complete.',
@@ -184,13 +261,11 @@ export class ChatGateway implements OnGatewayDisconnect {
     try {
       const confirmedOrder = await this.orderService.confirmOrder(orderId);
 
-      // Notify the user
       client.emit('order_confirmed', {
         orderId: confirmedOrder.id,
         status: confirmedOrder.status,
       });
 
-      // Notify Admin (broadcast to all admins or a specific admin room)
       this.server.emit('admin_notification', {
         type: 'ORDER_CONFIRMED',
         orderId: confirmedOrder.id,
@@ -205,9 +280,6 @@ export class ChatGateway implements OnGatewayDisconnect {
   }
 
   private async extractOrderDetails(content: string, userId: string) {
-    // This is a mock of LLM Tool-Calling.
-    // In a real implementation, we would use ChatOpenAI's tool calling.
-    // For this task, we use a simple pattern match to simulate tool extraction.
     if (content.toLowerCase().includes('order') && (content.toLowerCase().includes('want') || content.toLowerCase().includes('need'))) {
       const mockDetails = {
         userId,
