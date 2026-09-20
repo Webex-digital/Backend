@@ -1,6 +1,6 @@
 import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
-import { ChatService } from './chat.service.js';
-import { MixinAuthGuard } from '../auth/mixin-auth.guard.js';
+import { ChatService } from './chat.service';
+import { MixinAuthGuard } from '../auth/mixin-auth.guard';
 
 @Controller('chat')
 export class ChatController {
