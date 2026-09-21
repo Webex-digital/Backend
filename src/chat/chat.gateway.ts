@@ -16,7 +16,9 @@ import { MailService } from '../mail/mail.service';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: 'https://frontend-indol-seven-90.vercel.app',
+    methods: ['GET', 'POST'],
+    credentials: true,
   },
 })
 @UseFilters(HttpExceptionFilter)
