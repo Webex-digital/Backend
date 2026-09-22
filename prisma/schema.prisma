@@ -21,13 +21,15 @@ model User {
 }
 
 model Conversation {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  title     String?
+  status    String        @default("OPEN")
   messages  Message[]
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  files     PreviewFile[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model Message {
@@ -35,8 +37,8 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   senderId       String
+  senderType     String       @default("USER")
   content        String
-  type           String       @default("TEXT")
   // Temporarily using Float array to avoid pgvector dependency until it is installed on host
   embedding      Float[]
   createdAt      DateTime     @default(now())
@@ -53,6 +55,18 @@ model Order {
   updatedAt DateTime    @updatedAt
 }
 
+model PreviewFile {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  uploadedById   String
+  originalName   String
+  storageName    String       @unique
+  mimeType       String
+  size           Int
+  createdAt      DateTime     @default(now())
+}
+
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
@@ -66,8 +80,18 @@ model KnowledgeBase {
   id        String   @id @default(uuid())
   title     String
   content   String
-  // Using pgvector's vector type
-  embedding Unsupported("vector(1536)")
+  // Temporarily using Float array
+  embedding Float[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ContactRequest {
+  id             String   @id @default(uuid())
+  name           String
+  email          String
+  projectDetails String
+  status         String   @default("NEW")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

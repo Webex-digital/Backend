@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ChatGateway } from './chat.gateway';
-import { ChatService } from './chat.service';
-import { ChatController } from './chat.controller';
-import { KnowledgeModule } from '../knowledge/knowledge.module';
-import { OrderModule } from '../orders/order.module';
-import { MailModule } from '../mail/mail.module';
+import { PrismaModule } from '../prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { ConversationsModule } from '../conversations/conversations.module';
+import { ChatController } from './chat.controller';
+import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 
 @Module({
-  imports: [KnowledgeModule, OrderModule, MailModule, AuthModule],
+  imports: [PrismaModule, AuthModule, ConversationsModule],
   controllers: [ChatController],
-  providers: [ChatGateway, ChatService],
-  exports: [ChatService],
+  providers: [ChatService, ChatGateway],
 })
 export class ChatModule {}

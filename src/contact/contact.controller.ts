@@ -1,18 +1,14 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ContactService } from './contact.service';
-import type { ContactRequestDto } from './contact.service';
+import { CreateContactDto } from './dto/create-contact.dto';
 
 @Controller('contact')
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
   @Post()
-  @HttpCode(HttpStatus.OK)
-  async sendContact(@Body() dto: ContactRequestDto) {
-    await this.contactService.handleContactRequest(dto);
-    return {
-      success: true,
-      message: 'Your message has been sent successfully.',
-    };
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() body: CreateContactDto) {
+    return this.contactService.createRequest(body);
   }
 }

@@ -1,61 +1,51 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { Prisma } from '@prisma/client';
-import { OrderService } from '../orders/order.service';
+import { AskChatDto } from './dto/ask-chat.dto';
 
 @Injectable()
 export class ChatService {
-  constructor(
-    private prisma: PrismaService,
-    private orderService: OrderService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async saveMessage(data: Prisma.MessageCreateInput) {
-    return this.prisma.message.create({
-      data,
-    });
-  }
+  async ask(data: AskChatDto) {
+    const question = data.question.trim();
+    const terms = question.split(/\s+/).filter((term) => term.length > 3).slice(0, 5);
+    const article = terms.length
+      ? await this.prisma.knowledgeBase.findFirst({
+          where: {
+            OR: terms.flatMap((term) => [
+              { title: { contains: term, mode: 'insensitive' } },
+              { content: { contains: term, mode: 'insensitive' } },
+            ]),
+          },
+          orderBy: { updatedAt: 'desc' },
+        })
+      : null;
 
-  async getLastConversation(userId: string) {
-    return this.prisma.conversation.findFirst({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-    });
+    return {
+      mode: 'ai',
+      answer:
+        article?.content ||
+        'I can help with services, project timelines, and next steps. For a tailored answer, you can talk directly with our team.',
+      source: article ? { id: article.id, title: article.title } : null,
+      canEscalate: true,
+    };
   }
 
   async getActiveConversations() {
     return this.prisma.conversation.findMany({
-      where: {
-        ...({
-          status: { not: 'RESOLVED' },
-        } as any),
+      where: { status: 'OPEN' },
+      include: {
+        user: { select: { id: true, email: true, fullName: true } },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { updatedAt: 'desc' },
-      include: {
-        user: {
-          select: { email: true, fullName: true },
-        },
-        messages: {
-          take: 1,
-          orderBy: { createdAt: 'desc' },
-        },
-      },
     });
   }
 
-  async getMessagesByConversation(conversationId: string, limit: number = 20, cursor?: string) {
-    const messages = await this.prisma.message.findMany({
-      where: {
-        conversationId,
-        id: cursor ? { lt: cursor } : undefined,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
+  async getMessagesByConversation(conversationId: string) {
+    return this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
     });
-
-    return {
-      messages: messages.reverse(),
-      nextCursor: messages.length === limit ? messages[0].id : null,
-    };
   }
 }

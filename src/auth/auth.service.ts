@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
 import * as bcrypt from 'bcrypt';
-import { ForbiddenException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -12,8 +12,9 @@ export class AuthService {
   ) {}
 
   async register(data: { email: string; password: string; fullName?: string }) {
+    const email = data.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email },
     });
 
     if (existingUser) {
@@ -24,20 +25,26 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: data.email,
+        email,
         password: hashedPassword,
-        fullName: data.fullName,
+        fullName: data.fullName?.trim() || undefined,
       },
     });
 
-    // Do not return the password in the response
-    const { password, ...result } = user;
-    return result;
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      googleId: user.googleId,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   async login(data: { email: string; password: string }) {
     const user = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: data.email.trim().toLowerCase() },
     });
 
     if (!user || !user.password) {
