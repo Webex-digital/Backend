@@ -9,6 +9,9 @@ export class MailService {
     // For Gmail, you MUST use an "App Password", not your regular password.
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       auth: {
         user: process.env.MAIL_USER || 'producelabsandco@gmail.com',
         pass: process.env.MAIL_PASS || 'your-app-password-here',
