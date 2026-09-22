@@ -21,14 +21,57 @@ export class ChatService {
         })
       : null;
 
+    const answer = article?.content ||
+      'I can help with services, project timelines, and next steps. For a tailored answer, you can talk directly with our team.';
+    const visitor = await this.getOrCreateVisitor(data);
+    const conversation = await this.prisma.conversation.upsert({
+      where: { id: visitor.conversationId || '' },
+      create: { userId: visitor.userId, title: 'Website chat' },
+      update: { status: 'OPEN', updatedAt: new Date() },
+    });
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: visitor.userId,
+        senderType: 'USER',
+        content: question,
+        embedding: [],
+      },
+    });
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: visitor.userId,
+        senderType: 'AI',
+        content: answer,
+        embedding: [],
+      },
+    });
+
     return {
       mode: 'ai',
-      answer:
-        article?.content ||
-        'I can help with services, project timelines, and next steps. For a tailored answer, you can talk directly with our team.',
+      answer,
       source: article ? { id: article.id, title: article.title } : null,
       canEscalate: true,
+      conversationId: conversation.id,
     };
+  }
+
+  private async getOrCreateVisitor(data: AskChatDto) {
+    const sessionId = data.sessionId?.trim() || 'anonymous';
+    const email = data.email?.trim().toLowerCase() || `guest-${sessionId}@guest.webex.local`;
+    const user = await this.prisma.user.upsert({
+      where: { email },
+      create: { email, fullName: data.name?.trim() || 'Website visitor' },
+      update: data.name?.trim() ? { fullName: data.name.trim() } : {},
+    });
+    const existing = await this.prisma.conversation.findFirst({
+      where: { userId: user.id, status: 'OPEN' },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+    return { userId: user.id, conversationId: existing?.id };
   }
 
   async getActiveConversations() {

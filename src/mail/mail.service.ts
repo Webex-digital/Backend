@@ -30,7 +30,7 @@ export class MailService {
 
   async sendProposal(formData: { name: string; email: string; details: string }) {
     return this.sendMail(
-      'producelabsandco@gmail.com',
+      process.env.CONTACT_RECIPIENT || process.env.MAIL_USER || 'producelabsandco@gmail.com',
       `🚀 New Project Proposal from ${formData.name}`,
       `You have received a new proposal request!\n\nName: ${formData.name}\nEmail: ${formData.email}\n\nDetails:\n${formData.details}`,
       `
