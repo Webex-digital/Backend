@@ -2,8 +2,30 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { mkdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { PrismaClient } from '@prisma/client';
+
+async function ensureDatabaseSchema() {
+  const prisma = new PrismaClient();
+  try {
+    const tables = await prisma.$queryRawUnsafe<{ table_name: string }[]>(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
+    );
+    const existing = new Set(tables.map(({ table_name }) => table_name));
+    const required = ['User', 'Conversation', 'Message', 'Order', 'OrderItem', 'KnowledgeBase', 'ContactRequest', 'PreviewFile'];
+    if (required.every((table) => existing.has(table))) return;
+
+    const sql = await readFile('prisma/bootstrap.sql', 'utf8');
+    for (const statement of sql.split(/;\s*\n/).map((value) => value.trim()).filter(Boolean)) {
+      await prisma.$executeRawUnsafe(statement);
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+}
 
 async function bootstrap() {
+  await ensureDatabaseSchema();
   await mkdir('uploads/previews', { recursive: true });
   const app = await NestFactory.create(AppModule);
   app.enableCors({
