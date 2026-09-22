@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AskChatDto } from './dto/ask-chat.dto';
 
@@ -46,6 +46,17 @@ export class ChatService {
     return this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateConversationStatus(conversationId: string, status: string) {
+    const normalized = status.trim().toUpperCase();
+    if (!['OPEN', 'RESOLVED'].includes(normalized)) {
+      throw new BadRequestException('Status must be OPEN or RESOLVED');
+    }
+    return this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: normalized },
     });
   }
 }

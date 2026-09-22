@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Param, UseGuards } from '@nestjs/common';
 import { ChatService } from '../chat/chat.service.js';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { MixinAuthGuard } from '../auth/mixin-auth.guard';
@@ -19,9 +19,7 @@ export class AdminController {
   }
 
   @Patch('conversations/:id/status')
-  async updateStatus(@Param('id') id: string, @Request() req: any) {
-    // Logic to update status to RESOLVED/ACTIVE in DB
-    // For now, returning success as we prioritize the chat interface
-    return { status: 'updated', conversationId: id };
+  async updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+    return this.chatService.updateConversationStatus(id, body.status);
   }
 }
