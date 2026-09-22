@@ -17,8 +17,14 @@ async function ensureDatabaseSchema() {
 
     const sql = await readFile('prisma/bootstrap.sql', 'utf8');
     for (const statement of sql.split(/;\s*\n/).map((value) => value.trim()).filter(Boolean)) {
-      await prisma.$executeRawUnsafe(statement);
+      try {
+        await prisma.$executeRawUnsafe(statement);
+      } catch (error) {
+        console.error('Schema bootstrap statement skipped:', error);
+      }
     }
+  } catch (error) {
+    console.error('Schema bootstrap skipped:', error);
   } finally {
     await prisma.$disconnect();
   }
