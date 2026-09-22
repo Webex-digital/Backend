@@ -2,8 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { mkdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 
 async function bootstrap() {
+  execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate'], { stdio: 'inherit' });
   await mkdir('uploads/previews', { recursive: true });
   const app = await NestFactory.create(AppModule);
   app.enableCors({
