@@ -31,6 +31,10 @@ export class KnowledgeService {
     return null;
   }
 
+  answerFaq(question: string): string | null {
+    return this.findFaqMatch(question);
+  }
+
   async askQuestion(question: string): Promise<{ answer: string; requiresHuman: boolean }> {
     // 1. Try Hard-coded Professional FAQ first (Instant & Free)
     const faqAnswer = this.findFaqMatch(question);

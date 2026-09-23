@@ -1,13 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AskChatDto } from './dto/ask-chat.dto';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly knowledge: KnowledgeService,
+  ) {}
 
   async ask(data: AskChatDto) {
     const question = data.question.trim();
+    const faqAnswer = this.knowledge.answerFaq(question);
     const terms = question.split(/\s+/).filter((term) => term.length > 3).slice(0, 5);
     const article = terms.length
       ? await this.prisma.knowledgeBase.findFirst({
@@ -21,7 +26,7 @@ export class ChatService {
         })
       : null;
 
-    const answer = article?.content ||
+    const answer = faqAnswer || article?.content ||
       'I can help with services, project timelines, and next steps. For a tailored answer, you can talk directly with our team.';
     const visitor = await this.getOrCreateVisitor(data);
     const conversation = await this.prisma.conversation.upsert({
@@ -52,7 +57,9 @@ export class ChatService {
     return {
       mode: 'ai',
       answer,
-      source: article ? { id: article.id, title: article.title } : null,
+      source: faqAnswer
+        ? { id: 'professional-faq', title: 'WEBEX Professional FAQ' }
+        : article ? { id: article.id, title: article.title } : null,
       canEscalate: true,
       conversationId: conversation.id,
     };
