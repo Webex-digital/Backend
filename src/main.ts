@@ -62,8 +62,38 @@ async function bootstrap() {
   await ensureAdminAccount();
   await mkdir('uploads/previews', { recursive: true });
   const app = await NestFactory.create(AppModule);
+  const configuredOrigins = (process.env.FRONTEND_URL || process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = Array.from(
+    new Set([
+      'https://webex-digital.vercel.app',
+      'https://frontend-indol-seven-90.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:5500',
+      ...configuredOrigins,
+    ]),
+  );
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL?.split(',').map((value) => value.trim()) || true,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1');
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      return callback(null, true);
+    },
     credentials: true,
   });
   app.useGlobalPipes(
