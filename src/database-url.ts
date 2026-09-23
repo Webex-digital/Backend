@@ -4,10 +4,11 @@ export function getPrismaDatabaseUrl(): string | undefined {
 
   try {
     const url = new URL(raw);
-    if (url.hostname.includes('pooler.supabase.com') || url.searchParams.get('pgbouncer') === 'true') {
-      url.searchParams.set('pgbouncer', 'true');
-      url.searchParams.set('connection_limit', '1');
-    }
+    // Railway may receive either Supabase's pooler URL or its direct URL.
+    // Enabling Prisma's PgBouncer mode for both avoids prepared-statement
+    // collisions when a pooled connection is reused between requests.
+    url.searchParams.set('pgbouncer', 'true');
+    url.searchParams.set('connection_limit', '1');
     return url.toString();
   } catch {
     return raw;
