@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { mkdir } from 'node:fs/promises';
 import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { getPrismaOptions } from './database-url';
 
 async function ensureDatabaseSchema() {
@@ -31,8 +32,34 @@ async function ensureDatabaseSchema() {
   }
 }
 
+async function ensureAdminAccount() {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) return;
+  if (password.length < 10) {
+    console.error('ADMIN_PASSWORD must contain at least 10 characters; admin bootstrap skipped.');
+    return;
+  }
+
+  const prisma = new PrismaClient(getPrismaOptions());
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.upsert({
+      where: { email },
+      create: { email, password: passwordHash, fullName: process.env.ADMIN_NAME || 'WEBEX Admin', role: 'ADMIN' },
+      update: { password: passwordHash, role: 'ADMIN', fullName: process.env.ADMIN_NAME || 'WEBEX Admin' },
+    });
+    console.log(`Admin account ready for ${email}`);
+  } catch (error) {
+    console.error('Admin bootstrap skipped:', error);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function bootstrap() {
   await ensureDatabaseSchema();
+  await ensureAdminAccount();
   await mkdir('uploads/previews', { recursive: true });
   const app = await NestFactory.create(AppModule);
   app.enableCors({

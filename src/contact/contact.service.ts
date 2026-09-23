@@ -29,16 +29,16 @@ export class ContactService {
       },
     });
 
-    try {
-      await this.mailService.sendProposal({
-        name: request.name,
-        email: request.email,
-        details: request.projectDetails,
-      });
-      return { ...request, emailSent: true };
-    } catch (error) {
-      this.logger.error('Contact request saved, but notification email failed', error);
-      return { ...request, emailSent: false };
-    }
+    void this.mailService.sendProposal({
+      name: request.name,
+      email: request.email,
+      details: request.projectDetails,
+    }).then(() => {
+      this.logger.log(`Proposal notification sent for contact request ${request.id}`);
+    }).catch((error) => {
+      this.logger.error(`Contact request ${request.id} saved, but notification email failed`, error);
+    });
+
+    return { ...request, emailQueued: true };
   }
 }
