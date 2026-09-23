@@ -22,6 +22,9 @@ export class KnowledgeService {
 
   private findFaqMatch(question: string): string | null {
     const q = question.toLowerCase();
+    if (/^(hi|hello|hey|hii|good morning|good afternoon|good evening|greetings)[!.,\s]*$/.test(q)) {
+      return 'Hello! Welcome to WEBEX Digital. I can answer questions about our services, pricing, process, and timelines—or connect you with our team for a project conversation.';
+    }
     if (q.includes('price') || q.includes('cost') || q.includes('how much')) return this.professionalFAQ['pricing'];
     if (q.includes('service') || q.includes('do you do') || q.includes('offer')) return this.professionalFAQ['services'];
     if (q.includes('process') || q.includes('how it works') || q.includes('method')) return this.professionalFAQ['process'];
