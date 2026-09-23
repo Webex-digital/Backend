@@ -4,9 +4,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { mkdir } from 'node:fs/promises';
 import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaOptions } from './database-url';
 
 async function ensureDatabaseSchema() {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(getPrismaOptions());
   try {
     const tables = await prisma.$queryRawUnsafe<{ table_name: string }[]>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
