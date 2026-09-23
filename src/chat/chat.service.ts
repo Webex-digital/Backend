@@ -12,6 +12,7 @@ export class ChatService {
 
   async ask(data: AskChatDto) {
     const question = data.question.trim();
+    const isGreeting = /^(hi|hello|hey|hii|good morning|good afternoon|good evening|greetings)[!.,\s]*$/i.test(question);
     const visitor = await this.getOrCreateVisitor(data);
     const conversation = await this.prisma.conversation.upsert({
       where: { id: visitor.conversationId || '' },
@@ -35,7 +36,7 @@ export class ChatService {
       data: { conversationId: conversation.id, senderId: visitor.userId, senderType: 'USER', content: question, embedding: [] },
     });
 
-    if (humanTakeover) {
+    if (humanTakeover && !isGreeting) {
       return {
         mode: 'team',
         answer: 'Your message has been sent to our team. A WEBEX specialist will reply here shortly.',
