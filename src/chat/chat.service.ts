@@ -12,7 +12,7 @@ export class ChatService {
 
   async ask(data: AskChatDto) {
     const question = data.question.trim();
-    const isGreeting = /^(hi|hello|hey|hii|good morning|good afternoon|good evening|greetings)[!.,\s]*$/i.test(question);
+    const isGreeting = /^(hi|hello|hey|hii|howdy|greetings|namaste|good morning|good afternoon|good evening|good day)\b/i.test(question);
     const visitor = await this.getOrCreateVisitor(data);
     const conversation = await this.prisma.conversation.upsert({
       where: { id: visitor.conversationId || '' },
@@ -93,6 +93,16 @@ export class ChatService {
       where: { user: { email }, status: 'OPEN' },
       orderBy: { updatedAt: 'desc' },
       select: { id: true },
+    });
+  }
+
+  async getVisitorMessages(sessionId: string) {
+    const conversation = await this.getVisitorConversation(sessionId);
+    if (!conversation) return [];
+    return this.prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, senderType: true, content: true, createdAt: true },
     });
   }
 
