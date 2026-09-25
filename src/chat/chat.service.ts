@@ -109,7 +109,7 @@ export class ChatService {
   async getActiveConversations() {
     return this.prisma.conversation.findMany({
       where: { status: 'OPEN' },
-      include: { user: { select: { id: true, email: true, fullName: true } }, messages: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: { user: { select: { id: true, email: true, fullName: true } }, messages: { orderBy: { createdAt: 'desc' }, take: 50 } },
       orderBy: { updatedAt: 'desc' },
     });
   }
