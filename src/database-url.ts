@@ -8,7 +8,10 @@ export function getPrismaDatabaseUrl(): string | undefined {
     // Enabling Prisma's PgBouncer mode for both avoids prepared-statement
     // collisions when a pooled connection is reused between requests.
     url.searchParams.set('pgbouncer', 'true');
-    url.searchParams.set('connection_limit', '1');
+    // One connection is too restrictive when admin polling, visitor chat,
+    // Socket.IO fallback, and health checks arrive at the same time.
+    url.searchParams.set('connection_limit', '3');
+    url.searchParams.set('pool_timeout', '30');
     return url.toString();
   } catch {
     return raw;
